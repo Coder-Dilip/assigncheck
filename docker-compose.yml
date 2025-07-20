@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: assignchecker_db
+    environment:
+      POSTGRES_DB: assignchecker
+      POSTGRES_USER: assignchecker_user
+      POSTGRES_PASSWORD: assignchecker_pass
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - assignchecker_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assignchecker_user -d assignchecker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: assignchecker_backend
+    environment:
+      - DATABASE_URL=postgresql://assignchecker_user:assignchecker_pass@postgres:5432/assignchecker
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=2024-02-15-preview
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your_super_secret_jwt_key_change_in_production}
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - MEDIA_STORAGE_PATH=/app/media
+      - DEBUG=true
+    volumes:
+      - ./backend:/app
+      - media_storage:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - assignchecker_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: assignchecker_frontend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - assignchecker_network
+    command: npm run dev
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: assignchecker_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - assignchecker_network
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_storage:
+
+networks:
+  assignchecker_network:
+    driver: bridge

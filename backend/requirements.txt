@@ -1,0 +1,41 @@
+# FastAPI and ASGI server
+fastapi
+uvicorn[standard]
+
+# Database
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Authentication and Security
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+
+# Azure OpenAI
+openai
+azure-identity
+
+# Audio/Video Processing
+openai-whisper
+opencv-python
+ffmpeg-python
+
+# Data Validation and Serialization
+pydantic
+pydantic-settings
+python-dotenv
+
+# HTTP Client
+httpx
+aiofiles
+
+# Utilities
+loguru
+pytest
+pytest-asyncio
+
+# Development
+black
+isort
+flake8
